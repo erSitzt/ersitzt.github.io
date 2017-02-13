@@ -1,0 +1,532 @@
+/**
+ * Created with JetBrains PhpStorm.
+ * User: ralfboller
+ * Date: 14.10.13
+ * Time: 17:11
+ * To change this template use File | Settings | File Templates.
+ */
+
+
+var FactFinder2 = function (formId, config) {
+
+    var form = $('#' + formId);
+
+
+    var ffDefaults = {
+        searchURL           : js_info['base_url'],          // this one comes from the DOM!
+        proxy               : 'factfinder/proxy/suggest',   // URL to FACT-Finder suggest module
+        queryParamName      : 'query',
+        categoryParamName   : 'category',
+        calibratorParamName : 'category_path',
+        channelParamName    : 'channel',
+        channel             : 'de',
+        // tracking parameters (need to be defined)
+        sid				    : '123456',
+        uid				    : 'search',
+        site			    : 'expert.fact-finder.de',
+        sourceRefKey	    : '123456',
+
+        onDisplay           : function( sourceRefKey ) { /*console.log('yay')*/ }
+    }
+
+    var defaults = {
+        lastQuery: '',
+        minLength: 3,
+        debug: false,
+        instanceName: '',
+        searchURL: '',
+        proxy: '',
+        queryParamName: '',
+        suggest: [],
+        showImages: false,
+        currentSelection: -1,
+        sid: '',
+        uid: '',
+        site: '',
+        sourceRefKey: '',
+        onDisplay: '',
+        inputRef: '#query',
+        layerRef: '.suggest-layer',
+        categoryRef: '.search-category',
+        calibratorRef: '#suggest-calibrator',
+        inputObj:   false,
+        layerObj:   false,
+        topRightLayer: '.search-suggest-form--top-right',
+        topLeftLayer: '.search-suggest-form--top-left',
+        bottomRightLayer: '.search-suggest-form--bottom-right',
+        bottomLeftLayer: '.search-suggest-form--bottom-left',
+        categoryObj:false,
+        calibratorObj:false,
+        additionalAttribute: '',
+        linkKey:'deeplink',
+        formObj: '#search-suggest-form',
+
+        translation: {
+            unspecified: 'Sonstiges',
+            productName: 'Produktname',
+            productNameHead: 'Produktvorschl&auml;ge',
+            brand: 'Hersteller',
+            brandHead: 'Markenvorschl&auml;ge',
+            content: 'Inhalt',
+            searchTerm: 'Suchbegriff',
+            searchTermHead: 'Suchvorschl&auml;ge',
+            category: 'Kategorie',
+            categoryHead: 'Kategorievorschl&auml;ge',
+            hits: 'Treffer',
+            landingpage_brandHead: 'Markenvorschl&auml;ge',
+            brand_mergedHead: 'Markenvorschl&auml;ge',
+            landingpage_articleHead: 'Themenwelten',
+        },
+
+        classNames: {
+            suggestImageClass: 'suggest-image',
+            suggestQueryClass: 'suggest-text-query',
+            suggestTypeClass: 'suggest-text-type',
+            suggestAmountClass: 'suggest-text-amount',
+            suggestQueryTypedClass: 'suggest-text-query-typed',
+            suggestFooterClass: 'suggest-footer',
+            suggestHeaderClass: 'suggest-header',
+            suggestRowClass: 'suggest-row',
+            suggestHighlightClass: 'suggest-highlight',
+            suggestLayerBlock: 'suggest-layer-block'
+        },
+
+        suggestResult : []
+    }
+
+    //Config available @ var config
+    if (config && typeof( config ) == 'object') {
+        $.extend(defaults, config);
+    }
+
+    config = defaults;
+    config.inputObj = $(config.inputRef, form);
+    config.layerObj = $(config.layerRef, form);
+    config.categoryObj = $(config.categoryRef, form);
+    config.calibratorObj = $(config.calibratorRef, form);
+
+    var methods = {
+        init: function () {
+            if (form.length > 0) {
+                methods._initInput();
+            }
+        },
+        htmlEncode: function (value) {
+            return $('<div/>').text(value).html();
+        },
+        escapeMetaChars: function (query) {
+            return query.replace(/[^a-zA-Z0-9]/g, "\\\$&");
+        },
+        showLayer: function () {
+            config.layerObj.show();
+        },
+        hideLayer: function () {
+            config.layerObj.hide();
+        },
+        removeParam: function (param, name) {
+            var pPos = param.indexOf('?' + name);
+            if (pPos >= 0) {
+                var f = param.substring(0, pPos);
+                pPos = param.indexOf('&', pPos + 1);
+                if (pPos >= 0) {
+                    param = f + param.substring(pPos);
+                }
+            } else {
+                pPos = param.indexOf('&' + name);
+                if (pPos >= 0) {
+                    var f = param.substring(0, pPos);
+                    pPos = param.indexOf('&', pPos + 1);
+                    if (pPos >= 0) {
+                        param = f + param.substring(pPos);
+                    }
+                }
+            }
+            return param;
+        },
+        _initInput: function () {
+
+            var input = config.inputObj,
+                hovered = false,
+                timeout;
+
+            input.focus(function () {
+                methods.showLayer();
+            });
+
+            $(config.layerObj).bind("mouseover",function () {
+                hovered = true;
+            }).bind("mouseout", function () {
+                hovered = false;
+            });
+
+            input.blur(function () {
+                if (!hovered) {
+                    methods.hideLayer();
+                } else {
+                    $(config.layerObj).bind("mouseup", function () {
+                        methods.hideLayer();
+                    });
+                }
+            });
+
+            $(config.formObj).submit(function (event) {
+                methods._handleSubmit();
+            });
+
+            //End Type in Input
+
+            input.keyup(function (event) {
+
+                var inputText = $(this).val();
+
+                clearTimeout(timeout);
+
+                timeout = setTimeout(function () {
+
+                    if (inputText == input.val()) {
+                        methods._handleKeyPress(event, input);
+                    }
+
+                }, 300);
+
+            });
+
+        },
+        _handleClick: function (el) {
+
+            var text = $(el).attr('id');
+            var text = text.replace(/-product/g, '');
+            var text = text.replace(/-brand/g, '');
+            var url  = config.suggestResult[text].attributes[config.linkKey];
+
+            if (url) {
+
+                window.location = url;
+
+            } else {
+
+                if (config.suggestResult[text].name) {
+                    window.location = $(el).closest('form').attr('action') + '?q=' + config.suggestResult[text].name;
+                }
+
+            }
+
+        },
+
+        _handleSubmit: function (e) {
+        },
+
+        _handleKeyPress: function (event, inputObj) {
+
+            var currentQuery = inputObj.val();
+
+            if (currentQuery == '') return;
+
+            if (config.lastQuery != currentQuery && currentQuery.length >= config.minLength) {
+                this._getSuggestions(currentQuery);
+            }
+
+            config.lastQuery = currentQuery;
+
+        },
+        _getSuggestions: function (query) {
+
+            // create request to FF module
+            var ffProxy = ffDefaults.searchURL + ffDefaults.proxy + '?'
+                + ffDefaults.queryParamName + '=' + encodeURIComponent(query) + '&'
+                /*+ ((config.categoryObj) ? ffDefaults.categoryParamName + '=' + encodeURIComponent(config.categoryObj.val()) + '&' : '')*/
+                + ((config.calibratorObj) ? ffDefaults.calibratorParamName + '=' + encodeURIComponent(config.calibratorObj.val()) + '&' : '')
+                + ffDefaults.channelParamName + '=' + ffDefaults.channel
+                + '&format=jsonp&callback=?&omitContextName=true'
+                + config.additionalAttribute;
+
+            $.ajax({ url: ffProxy })
+
+                .done(function (data) {
+                    if (data != null && data.length > 0) {
+
+                        var outputTexts = {};
+                        var outputTextsBrand = {};
+                        var counters = {};
+
+                        // if the query contains regular expression metacharacters then escape them
+                        query = methods.escapeMetaChars(query);
+
+                        // data is NOT valid JSON. That's why we need to manipulate a bit right here
+                        // TODO: get rid of this, implement a proper callback for jsonp!
+                        var jsonObj = $.parseJSON("" + data.slice(1, -2) + "");
+
+                        // save result
+                        config.suggestResult = jsonObj;
+
+                        var lastType = '';
+
+                        if(jsonObj.length) {
+
+                            $.each(jsonObj, function (index) {
+
+                                /* possible suggest types are:
+                                 - productName
+                                 - category
+                                 - searchTerm
+                                 - brand
+                                 - Bodegas
+                                 - landingpage_brand
+                                 - landingpage_article
+                                 */
+                                var suggestType = jsonObj[index].type;
+
+                                if (suggestType == 'landingpage_brand' || suggestType == 'brand') {
+                                    var suggestTypeOriginal = suggestType;
+                                    suggestType = 'brand_merged'
+                                }
+
+                                if (suggestType != lastType) {
+                                    var suggestTypeHead = config.translation[suggestType + 'Head'];
+
+                                    if (!suggestTypeHead) suggestTypeHead = suggestType;
+
+                                    outputTexts[suggestType] = '<li class="' + config.classNames.suggestHeaderClass + '">' + suggestTypeHead + '</li>';
+                                    counters[suggestType] = 0;
+                                    lastType = suggestType;
+                                }
+
+                                switch (suggestType) {
+
+                                    // Add category suggests.
+                                    case 'category':
+                                        // MAX 4
+                                        if (counters[suggestType] >= 4) break;
+                                        outputTexts[suggestType] += methods.suggestHtmlCategory(jsonObj[index], query, index);
+                                        counters[suggestType]++;
+                                        break;
+
+                                    // Add search term suggests.
+                                    case 'searchTerm':
+                                        // MAX 4
+                                        if (counters[suggestType] >= 4) break;
+                                        outputTexts[suggestType] += methods.suggestHtmlTerm(jsonObj[index], query, index);
+                                        counters[suggestType]++;
+                                        break;
+
+                                    case 'productName':
+                                        // MAX 4
+                                        if (counters[suggestType] >= 4) break;
+                                        outputTexts[suggestType] += methods.suggestHtmlProduct(jsonObj[index], query, index);
+                                        counters[suggestType]++;
+                                        break;
+
+                                    // Add landing page suggests.
+                                    case 'brand_merged':
+                                        // MAX 3
+                                        if (counters['brand'] >= 3) break;
+
+                                        var node = jsonObj[index],
+                                            image = node.image ? node.image : (node.attributes.image ? node.attributes.image : 'undefined' );
+
+                                        if ( (image in outputTextsBrand ) ) {
+                                            if ( suggestTypeOriginal == 'landingpage_brand') {
+                                                outputTextsBrand[image] = methods.suggestHtmlBrand(jsonObj[index], query, index);
+                                                counters['brand']++;
+                                            }
+                                        } else {
+                                            outputTextsBrand[image] = methods.suggestHtmlBrand(jsonObj[index], query, index);
+                                            counters['brand']++;
+                                        }
+                                        break;
+
+                                    case 'landingpage_article': // TODO how should we display this?
+                                        outputTexts[suggestType] += methods.suggestHtmlLandingPage(jsonObj[index], query, index);
+                                        break;
+
+                                    default:
+                                }
+
+                            });
+                        }
+
+                        // No need to render suggest drop down menu.
+                        if (outputTexts.length === 0) {
+                            return;
+                        }
+
+                        // Search box and reset content
+                        var layer = $(config.layerObj);
+
+                        layer.html('<div class="search-suggest-form search-suggest-form--top"><div class="search-suggest-form search-suggest-form--top-right"></div><div class="search-suggest-form search-suggest-form--top-left"></div></div><div class="search-suggest-form search-suggest-form--bottom"><div class="search-suggest-form search-suggest-form--bottom-right"></div><div class="search-suggest-form search-suggest-form--bottom-left"></div></div>');
+                        var topRightLayer = $(config.topRightLayer, layer);
+                        var topLeftLayer = $(config.topLeftLayer, layer);
+                        var bottomRightLayer = $(config.bottomRightLayer, layer);
+                        var bottomLeftLayer = $(config.bottomLeftLayer, layer);
+
+
+                        console.log(outputTexts);
+                        console.log(outputTextsBrand);
+
+
+                        // Surround item with ul-tag.
+                        for (var key in outputTexts) {
+
+                            if (key != 'brand_merged') {
+                                outputTexts[key] = '<ul class="' + config.classNames.suggestLayerBlock + ' suggest-list-' + key + '">'
+                                    + outputTexts[key]
+                                    + '</ul>';
+                            } else {
+
+                                var brandOutput = "";
+
+                                for (var brand in outputTextsBrand) {
+                                    if (brand != 'undefined') {
+                                        brandOutput += outputTextsBrand[brand];
+                                    }
+                                }
+
+                                outputTexts[key] = '<ul class="' + config.classNames.suggestLayerBlock + ' suggest-list-' + key + '">'
+                                    + outputTexts[key] + brandOutput
+                                    + '</ul>';
+                            }
+
+                            switch (key) {
+                                // Add category suggests.
+                                case 'category':
+                                    topRightLayer.append(outputTexts[key]);
+                                    break;
+
+                                // Add search term suggests.
+                                case 'searchTerm':
+                                    topRightLayer.append(outputTexts[key]);
+                                    break;
+
+                                case 'productName':
+                                    topLeftLayer.append(outputTexts[key]);
+                                    break;
+
+                                // Add landing page suggests.
+                                case 'brand_merged':
+                                    bottomLeftLayer.append(outputTexts[key]);
+                                    break;
+
+                                case 'landingpage_article': // TODO how should we display this?
+                                    break;
+
+                                // TODO: missing themenwelt
+                                default:            //console.log('Fatal Error: suggestType:' + suggestType + ' unknown, sorry...');
+                            }
+
+                        }
+
+                        methods.showLayer();
+
+                        $('ul li', layer).hover(function () {
+                            if (!$(this).hasClass(config.classNames.suggestHeaderClass)) $(this).addClass(config.classNames.suggestHighlightClass);
+                        }, function () {
+                            if ($(this).hasClass(config.classNames.suggestHighlightClass)) $(this).removeClass(config.classNames.suggestHighlightClass);
+                        });
+
+                        $("." + config.classNames.suggestRowClass, layer).on("click", function () {
+                            methods._handleClick($(this));
+                        });
+
+                    }
+                })
+
+                .fail(function (e, xhr, settings, exception) {
+                    //console.log('Error:\nHTTP result code: ' + e.status + '\nrequested URL: ' + ffProxy);
+                });
+
+        },
+        // Products have a direct deeplink url
+        suggestHtmlProduct: function (node, query, id) {
+
+            var c = config.classNames,
+                productName = node.name,
+                image = node.attributes.image ? node.attributes.image : '' ;
+
+            // go, create that piece of html
+            var html = '<li id="' + id + '-product" class="' + c.suggestRowClass + '">'
+                + '<img src="' + image + '" class="suggest-product-image"/>'
+                + '<span class="' + c.suggestQueryClass + '">'
+                + this.htmlEncode(productName).replace(new RegExp("(" + query + ")", "ig"), '<span class="'
+                + c.suggestQueryTypedClass + '">$1</span>')
+                + '</span>';
+
+            return html;
+
+        },
+        // Products have a direct deeplink url
+        suggestHtmlBrand: function (node, query, id) {
+
+            var c = config.classNames,
+                productName = node.name,
+                image = node.image ? node.image : (node.attributes.image ? node.attributes.image : '' );
+
+            // go, create that piece of html
+            var html = '<li id="' + id + '-brand" class="' + c.suggestRowClass + '">'
+                + '<img src="' + image + '" class="suggest-brand-image"/>';
+
+            return html;
+
+        },
+
+        // Categories have a specific search filter
+        suggestHtmlCategory: function (node, query, id) {
+
+            return methods.suggestHtml(id, node.name, query);
+
+        },
+
+        suggestHtmlTerm: function (node, query, id) {
+
+            var count = node.hitCount;
+
+            switch (count) {
+                case 0:
+                    count = '';
+                    break;
+                case 1:
+                    count = '1 ' + config.translation.hits;
+                    break;
+                default:
+                    var temp = count;
+                    count = ('{0} ' + config.translation.hits).replace(/\{0\}/, temp);
+            }
+
+            var html = methods.suggestHtml(id, node.name, query);
+
+            // Don't need this for now
+            // html += ' <span class="' + c.suggestAmountClass + '">(' + count + ')</span>';
+
+            return html;
+        },
+
+        // landing pages (manufacturer shop / articles from ezPublish).
+        suggestHtmlLandingPage: function (node, query, id) {
+
+            return methods.suggestHtml(id, node.name, query);
+
+        },
+
+        // function to generate markup for suggest item.
+        suggestHtml: function (id, value, query) {
+
+            var c = config.classNames;
+
+            return ('<li id="' + id + '" class="' + c.suggestRowClass + '">'
+            + '<span class="' + c.suggestQueryClass + '">'
+            + this.htmlEncode(value).replace(new RegExp("(" + query + ")", "ig"), '<span class="'
+                + c.suggestQueryTypedClass + '">$1</span>')
+            + '</span>');
+        }
+    }
+
+    return methods;
+
+}
+
+
+$(function() {
+
+    var topSearchInstance = FactFinder2('search-suggest-form',{inputRef: '#query'});
+    topSearchInstance.init();
+
+});

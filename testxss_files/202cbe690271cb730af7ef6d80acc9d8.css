@@ -1,0 +1,10 @@
+
+
+/* print.css
+******************************************/
+body{color:#222;font-size:11pt;font-family:'Arial','Verdana',sans-serif!important;letter-spacing:0 !important;background:transparent}.reviews{display:none}.add-to-cart,.hotline,.main-navi,#alaTestReviews,#image-zoom,footer,#recent-sales,#breadcrumb,#timer,#socialize,.reasurance,.product-newsletter,#product-thumbs,.d2c-tabnav,#abrccontent,.topnav{display:none !important}#price-info{border:0;padding:0}#save-notice{width:100%}#price-box .legal-notice,#exp-special-price,#save-notice{float:none;position:static}#price-box .legal-notice{clear:left;display:block}.sku{white-space:nowrap}#main-image{margin-top:74px}#alaTestSnippet{top:50px}.d2c-tabcontent
+li{display:block !important}.abreviewalatm{position:fixed!important;top:50px!important}#product-additionals .d2c-tabcontent{border-width:0}#product-additionals{width:100%}.d2c-tabcontent .description:before,
+.d2c-tabcontent .sod:before,
+.d2c-tabcontent .h-specs:before{display:block;font-size:25px;margin-bottom:20px}.description:before{content:'BESCHREIBUNG'}.product-specs{-moz-column-count:2;-webkit-column-count:2;-moz-column-gap:20px;-webkit-column-gap:20px}.h-specs{page-break-before:always}.h-specs:before{content:'MERKMALE'}.sod:before{content:'LIEFERUMFANG'}.product-specs
+td{padding:5px!important}.product-specs
+table{width:470px}.tswidget_main{display:none}#breadcrumb+.messages{display:none}.full-range #product-bottom{display:none}
