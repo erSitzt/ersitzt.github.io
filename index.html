@@ -68,6 +68,14 @@ verseChoose.onchange = function() {
   var verse = verseChoose.value;
   updateDisplay(verse);
 };
+      function updateDisplay(verse) {
+        var url = 'http://localhost:8000';
+fetch(url).then(function(response) {
+  response.text().then(function(text) {
+    poemDisplay.textContent = text;
+  });
+});
+};
     </script>
   </body>
 </html>
