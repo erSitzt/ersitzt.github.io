@@ -69,7 +69,7 @@ verseChoose.onchange = function() {
   updateDisplay(verse);
 };
       function updateDisplay(verse) {
-        var url = 'http://localhost:8000';
+        var url = 'http://localhost:8080';
 fetch(url).then(function(response) {
   response.text().then(function(text) {
     poemDisplay.textContent = text;
